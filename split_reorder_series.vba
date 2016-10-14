@@ -85,14 +85,16 @@ End Function
 
 Sub ReorderColumns()
 
+    lastrow = Range("A" & Rows.Count).End(xlUp).Row
+    
     ' Change formulas to values
-    With Columns("H")               ' Time
+    With Range("H1:H" & lastrow)               ' Time
         .Value = .Value
     End With
     Columns("H").NumberFormat = "HH:MM"
     
 
-    With Columns("K")               ' Department
+    With Range("K1:K" & lastrow)               ' Department
         .Value = .Value
     End With
     
@@ -129,9 +131,19 @@ Sub ReorderColumns()
     
     ' Add END column
     Columns("J").Insert
+    
+    ' Formula to calculate end time from start time and appt duration
+    Range("J2").Formula = "=I2+TIME(0,K2,0)"
+    Range("J2").AutoFill Destination:=Range("J2:J" & lastrow)
+
+    ' Convert to values
+    With Columns("J")
+        .Value = .Value
+    End With
+    
     Cells(1, "J").Value = "End"
     Columns("J").NumberFormat = "HH:MM"
-    
+
 End Sub
 
 
@@ -159,25 +171,25 @@ Public Sub CalcSeries()
     
     Do While i <= ActiveSheet.UsedRange.Rows.Count
         UNum = Cells(i, "G").Value
-        startDate = Cells(i, "K").Value
-        startTime = Cells(i, "H").Value
-        endTime = DateAdd("n", Cells(i, "J").Value, startTime)
+        startDate = Cells(i, "L").Value
+        startTime = Cells(i, "I").Value
+        endTime = DateAdd("n", Cells(i, "K").Value, startTime)
         
-        Cells(i, "I").Value = endTime
-        Cells(i, "H").Font.Color = vbBlue ' start
+        Cells(i, "J").Value = endTime
+        Cells(i, "I").Font.Color = vbBlue ' start
         
         i = i + 1
         Do While i <= Rows.Count
             nextUNum = Cells(i, "G").Value
-            nextStartDate = Cells(i, "K").Value
+            nextStartDate = Cells(i, "L").Value
             
             If nextUNum = UNum And startDate = nextStartDate Then
             
-                nextStartTime = Cells(i, "H").Value
+                nextStartTime = Cells(i, "I").Value
                 
                 Gap = DateDiff("n", endTime, nextStartTime)
                 If Gap <= 60 Then
-                    newEndTime = DateAdd("n", Cells(i, "J").Value, nextStartTime)
+                    newEndTime = DateAdd("n", Cells(i, "K").Value, nextStartTime)
                     Cells(i, "I").Value = newEndTime
                     If newEndTime > endTime Then
                        endTime = newEndTime
@@ -192,8 +204,8 @@ Public Sub CalcSeries()
         Loop
         
         duration = DateDiff("n", startTime, endTime)
-        Cells(i - 1, "I").Value = endTime
-        Cells(i - 1, "I").Font.Color = vbRed
+        Cells(i - 1, "J").Value = endTime
+        Cells(i - 1, "J").Font.Color = vbRed
     Loop
 End Sub
 
@@ -204,5 +216,3 @@ Sub SplitReorderMakeSeries()
     CalcSeries
     
 End Sub
-
-
