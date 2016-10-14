@@ -85,6 +85,17 @@ End Function
 
 Sub ReorderColumns()
 
+    ' Change formulas to values
+    With Columns("H")               ' Time
+        .Value = .Value
+    End With
+    Columns("H").NumberFormat = "HH:MM"
+    
+
+    With Columns("K")               ' Department
+        .Value = .Value
+    End With
+    
     ' Add columns
     Columns("A").Insert
     Cells(1, "A").Value = "Interpreter"
@@ -97,28 +108,18 @@ Sub ReorderColumns()
     Columns("O").Insert
     Columns("H").Cut               ' Date
     Columns("L").Insert
-    Columns("H").Cut               ' original Time
-    Columns("S").Insert
+    Columns("H").EntireColumn.Delete    ' original Time
     Columns("K").Cut               ' original Department
     Columns("R").Insert
+    Columns("K").Cut               ' new Department
+    Columns("H").Insert
     Columns("N").Cut               ' Perm Com
     Columns("Q").Insert
     Columns("M").Cut               ' Type
     Columns("L").Insert
     
-    ' Change formulas to values
-    With Columns("H")               ' Time
-        .Value = .Value
-    End With
-    Columns("H").NumberFormat = "HH:MM"
-    
-
-    With Columns("K")               ' Department
-        .Value = .Value
-    End With
-    
     ' Hide columns
-    Range("Q:Z").EntireColumn.Hidden = True
+    ' Range("Q:Z").EntireColumn.Hidden = True
 
     ' Capitalize some headers
     Cells(1, "D").Value = StrConv(Cells(1, "D").Value, vbUpperCase)
@@ -127,9 +128,9 @@ Sub ReorderColumns()
     Cells(1, "K").Value = StrConv(Cells(1, "K").Value, vbUpperCase)
     
     ' Add END column
-    Columns("I").Insert
-    Cells(1, "I").Value = "End"
-    Columns("I").NumberFormat = "HH:MM"
+    Columns("J").Insert
+    Cells(1, "J").Value = "End"
+    Columns("J").NumberFormat = "HH:MM"
     
 End Sub
 
@@ -203,3 +204,5 @@ Sub SplitReorderMakeSeries()
     CalcSeries
     
 End Sub
+
+
