@@ -1,0 +1,115 @@
+
+Sub CellSplitter()
+
+    Dim lastrow As Integer
+    lastrow = GetLastRow()
+
+    Dim Oarray() As String 'O matches column needing to be split
+    Dim Parray() As String 'P matches column needing to be split
+    Dim LongestArray As Integer
+    Dim TempInt As Integer
+
+    Dim i As Integer
+    i = 1
+    
+    'This script adds new "Time" column and inserts forumla
+    Columns("H:H").Insert Shift:=xlToRight, _
+      CopyOrigin:=xlFormatFromLeftOrAbove 'or xlFormatFromRightOrBelow
+    Worksheets(1).Range("H1:H" & lastrow).Formula = "=TEXT(TRIM(G1),""HH:MM"")"
+    
+    'This script adds new "Department" column and inserts formula
+    Columns("K:K").Insert Shift:=xlToRight, _
+      CopyOrigin:=xlFormatFromLeftOrAbove 'or xlFormatFromRightOrBelow
+    Worksheets(1).Range("K1:K" & lastrow).Formula = "=IF(ISERR(FIND("","",J1,1)),J1,LEFT(J1,FIND("","",J1,1)-1))"
+    
+    Do While i <= lastrow
+
+        Oarray = Split(Range("O" & i), Chr(10)) 'Chr(10) = carriage return w/i the cell
+        Parray = Split(Range("P" & i), Chr(10))
+        LongestArray = GetLongestArray(Oarray, Parray)
+
+        If LongestArray > 0 Then
+
+            ' reset the values of O and P columns
+            On Error Resume Next
+            Range("O" & i).Value = Oarray(0)
+            Range("P" & i).Value = Parray(0)
+            Err.Clear
+            On Error GoTo 0
+
+            ' duplicate the row multiple times
+            For TempInt = 1 To LongestArray
+
+                Rows(i & ":" & i).Select
+                Selection.Copy
+
+                Range(i + TempInt & ":" & i + TempInt).Select
+                Selection.Insert Shift:=xlDown
+
+                ' as each row is copied, change the values of O and P
+                On Error Resume Next
+                Range("O" & i + TempInt).Value = Oarray(TempInt)
+                If Err.Number > 0 Then Range("O" & i + TempInt).Value = ""
+                Err.Clear
+                Range("P" & i + TempInt).Value = Parray(TempInt)
+                If Err.Number > 0 Then Range("P" & i + TempInt).Value = ""
+                Err.Clear
+                On Error GoTo 0
+
+                Application.CutCopyMode = False
+
+            Next TempInt
+
+            ' increment the outer FOR loop's counters
+            lastrow = lastrow + LongestArray
+            i = i + LongestArray
+
+        End If
+
+        i = i + 1
+    Loop
+
+End Sub
+
+Function GetLongestArray(ByRef Oarray() As String, ByRef Parray() As String)
+    GetLongestArray = UBound(Oarray)
+    If UBound(Parray) > GetLongestArray Then GetLongestArray = UBound(Parray)
+End Function
+
+Function GetLastRow() As Integer
+    Worksheets(1).Select 'Select the first worksheet in the workbook...adjust as needed
+    Range("A1").Select
+    Selection.End(xlDown).Select
+    GetLastRow = Selection.Row
+    Range("A1").Select
+End Function
+
+Sub ColumnOrder()
+'
+' ColumnOrder Macro
+'
+
+'
+    Columns("A:A").Select
+    Selection.Cut
+    Columns("O:O").Select
+    Selection.Insert Shift:=xlToRight
+    Columns("L:L").Select
+    Selection.Cut
+    Columns("A:A").Select
+    Selection.Insert Shift:=xlToRight
+    Columns("G:G").Select
+    Selection.Cut
+    Columns("Q:Q").Select
+    Selection.Insert Shift:=xlToRight
+    Columns("I:I").Select
+    Selection.Cut
+    Columns("P:P").Select
+    Selection.Insert Shift:=xlToRight
+End Sub
+
+Sub CellSplitterColumnOrder()
+    CellSplitter
+    ColumnOrder
+End Sub
+
