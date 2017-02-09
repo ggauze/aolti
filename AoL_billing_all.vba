@@ -388,9 +388,11 @@ Private Sub FindSeries()
             actDuration = actDuration - LCLDuration(startIdx, i - 1)
             If actDuration < 240 Then
                 Duration = 240  ' MAX4 '
+                endTime = DateAdd ("n", Duration, startTime)
                 Call ConcatOrSetValue(i - 1, b_NOTES, vbRed, "MAX4")
             Else
                 Duration = actDuration
+                endTime = endTimeAct
             End If
         End If
 
