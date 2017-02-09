@@ -389,6 +389,8 @@ Private Sub FindSeries()
             If actDuration < 240 Then
                 Duration = 240  ' MAX4 '
                 Call ConcatOrSetValue(i - 1, b_NOTES, vbRed, "MAX4")
+            Else
+                Duration = actDuration
             End If
         End If
 
