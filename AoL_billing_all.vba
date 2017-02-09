@@ -445,6 +445,7 @@ Private Sub FindSeries()
         End If
 
         units = units - postHoursUnits
+        Call ConcatOrSetValue(i-1, b_TYPE_OF_PAY, vbRed, postHoursUnits)
 
         ' Calculate totals '
         Cells(i - 1, b_INTERPTOTAL).Value = units * Cells(i - 1, b_INTERPRATE).Value + postHoursUnits * (Cells(i - 1, b_INTERPRATE).Value + INTERPRETER_OVERCHARGE)
