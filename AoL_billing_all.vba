@@ -254,10 +254,10 @@ End Sub
 
 Private Sub ConcatOrSetValue(Row As Variant, Column As Variant, Color As Long, Value As Variant)
     Dim newValue As Variant
-    If Cells(Row, Column).Value <> "" Then
-        newValue = Cells(Row, Column).Value + ", " + Value
-    Else
+    If IsEmpty(Cells(Row, Column).Value) Then
         newValue = Value
+    Else
+        newValue = CStr(Cells(Row, Column).Value) & ", " & CStr(Value)
     End If
 
     Call SetValue(Row, Column, Color, newValue)
