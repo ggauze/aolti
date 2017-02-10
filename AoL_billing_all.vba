@@ -455,7 +455,7 @@ Private Sub FindSeries()
 
 End Sub
 
-Public Sub test()
+Public Sub RunAOLTIBilling()
     
     Call GlobalInit
 
