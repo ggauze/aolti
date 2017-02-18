@@ -356,8 +356,8 @@ Private Sub FindSeries()
     i = 2
     Do While i <= LastRow
         startIdx = i
-        startTimeSch = Cells(i, b_S_START).Value
-        startTimeAct = Cells(i, b_A_START).Value
+        startTimeSch = Round(Cells(i, b_S_START).Value, 15)
+        startTimeAct = Round(Cells(i, b_A_START).Value, 15)
         endTimeSch = FindSeriesEnd(True, i)
         i = startIdx
         endTimeAct = FindSeriesEnd(False, i)
@@ -432,9 +432,9 @@ Private Sub FindSeries()
             dayStart = TimeValue("8:00 am")
             dayEnd = TimeValue("5:00 pm")
     
-            preMins = DateDiff("n", startTime, dayStart)
-            postMins = DateDiff("n", dayEnd, endTime)
-    
+            preMins = DateDiff("n", startTime, WorksheetFunction.Min(dayStart, endTime))
+            postMins = DateDiff("n", WorksheetFunction.Max(dayEnd, startTime), endTime)    
+
             If (preMins > 0) Then
                 postHoursUnits = WorksheetFunction.RoundUp(preMins / 15, 0) / 4
             End If
@@ -445,7 +445,9 @@ Private Sub FindSeries()
         End If
 
         units = units - postHoursUnits
-        Call ConcatOrSetValue(i-1, b_TYPE_OF_PAY, vbRed, postHoursUnits)
+        If postHoursUnits > 0 Then
+            Call ConcatOrSetValue(i-1, b_TYPE_OF_PAY, vbRed, postHoursUnits)
+        End IF
 
         ' Calculate totals '
         Cells(i - 1, b_INTERPTOTAL).Value = units * Cells(i - 1, b_INTERPRATE).Value + postHoursUnits * (Cells(i - 1, b_INTERPRATE).Value + INTERPRETER_OVERCHARGE)
