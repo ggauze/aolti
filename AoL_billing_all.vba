@@ -4,8 +4,13 @@ Public Const IntepreterRatesFile = "C:/Users/sgringauze.ISTREAMPLANET/Dropbox/Ka
 
 ' Some constants - modify as needed
 Public Const SCCA_RATE = 48
-Public Const SCCA_OVERCHAGRE = 7
+Public Const SCCA_OVERCHARGE = 7
 Public Const INTERPRETER_OVERCHARGE = 5
+
+' Color index
+
+Public Const LIGHT_GREEN = 50
+Public Const LIGHT_BLUE = 23
 
 ' Modify the following constants if column order is changed'
 
@@ -87,9 +92,9 @@ Private Sub GlobalInit()
     Columns(b_A_END).NumberFormat = "h:mm AM/PM"
 
     ' !!! ATTENTION: The following line makes assumption about column locations in the table '
-    ' !!! It clears all contents of the columns betwen Units and SCCATotal, inclusively
+    ' !!! It clears all contents of the columns betwen TypeOfPay and SCCATotal, inclusively
 
-    Range(Cells(2, b_UNITS), Cells(LastRow, b_SCCATOTAL)).Clear
+    Range(Cells(2, b_TYPE_OF_PAY), Cells(LastRow, b_SCCATOTAL)).Clear
 
     Columns(b_INTERPRATE).NumberFormat = "$#,##0.00"
     Columns(b_INTERPTOTAL).NumberFormat = "$#,##0.00"
@@ -325,7 +330,7 @@ Function FindSeriesEnd(isScheduled As Variant, ByRef startIdx As Variant) As Var
                 Cells(i - 1, b_INTERPRATE).Clear
                 Cells(i - 1, b_SCCARATE).Clear
 
-           Else
+            Else
                 Exit Do
             End If
         Else
@@ -350,6 +355,24 @@ Function LCLDuration(startIdx As Variant, endIdx As Variant) As Variant
     Next i
 End Function
 
+'
+' Find a max time in A_END columnt between the given indexes
+'
+Function GetHighlightIndex(startIdx As Variant, endIdx As Variant, endTime as Variant) As Variant
+    GetHighlightIndex = startIdx
+    maxTime = Cells(startIdx, b_A_END).Value
+    For i = startIdx To endIdx
+        If Cells(i, b_A_END).Value = endTime Then
+            GetHighlightIndex = i    
+            Exit Function
+        Else
+            If Cells(i, b_A_END).Value > maxTime Then
+                maxTime = Cells(i, b_A_END).Value
+                GetHighlightIndex = i
+            End If
+        End If
+    Next i
+End Function
 
 Private Sub FindSeries()
 
@@ -359,11 +382,14 @@ Private Sub FindSeries()
         startTimeSch = Round(Cells(i, b_S_START).Value, 15)
         startTimeAct = Round(Cells(i, b_A_START).Value, 15)
         endTimeSch = FindSeriesEnd(True, i)
+        endTimeSchIdx = i - 1
         i = startIdx
         endTimeAct = FindSeriesEnd(False, i)
+        endTimeActIdx = i - 1
 
+        endIdx = WorksheetFunction.Max(endTimeSchIdx, endTimeActIdx)
         startTime = WorksheetFunction.Min(startTimeSch, startTimeAct)
-        endTime = WorksheetFunction.Max(endTimeSch, endTimeAct)
+        endTime = WorksheetFunction.Max(endTimeSch, endTimeAct)        
 
         ' Check if arrival time is later than the scheduled start
         If Cells(startIdx, b_ARRIVAL_TIME).Value > startTimeSch Then
@@ -377,6 +403,7 @@ Private Sub FindSeries()
         ' Handle MIN2 '
         If Duration < 120 And Cells(startIdx, b_MIN2) Then
             Duration = 120
+            endTime = DateAdd ("n", Duration, startTime)
         End If
 
         ' Handle MAX4 '
@@ -385,43 +412,45 @@ Private Sub FindSeries()
 
         If schDuration > 240 Then
             ' Find if there are LCLs in this series'
-            actDuration = actDuration - LCLDuration(startIdx, i - 1)
+            actDuration = actDuration - LCLDuration(startIdx, endIdx)
             If actDuration < 240 Then
                 Duration = 240  ' MAX4 '
                 endTime = DateAdd ("n", Duration, startTime)
-                Call ConcatOrSetValue(i - 1, b_NOTES, vbRed, "MAX4")
+                Call ConcatOrSetValue(endIdx, b_NOTES, vbRed, "MAX4")
             Else
                 Duration = actDuration
                 endTime = endTimeAct
             End If
+
         End If
 
         ' Calculate units'
         units = WorksheetFunction.RoundUp(Duration / 15, 0) / 4
-        Cells(i - 1, b_UNITS).Value = units
-        Cells(i - 1, b_UNITS).Font.Color = vbRed
+        Cells(endIdx, b_UNITS).Value = units
+        Cells(endIdx, b_UNITS).Font.ColorIndex = vbRed
 
         ' Highlight series end
-        If endTimeSch >= endTimeAct Then
-            Cells(i - 1, b_S_END).Interior.Color = vbBlue
-            Cells(i - 1, b_S_END).Font.Color = vbRed
+        If endTimeSch >= endTimeAct And endTime = endTimeSch Then
+            Cells(endIdx, b_S_END).Interior.ColorIndex = LIGHT_BLUE
+            Cells(endIdx, b_S_END).Font.ColorIndex = vbRed
         Else
-            Cells(i - 1, b_A_END).Interior.Color = vbBlue
-            Cells(i - 1, b_A_END).Font.Color = vbRed
+            hlIdx = GetHighlightIndex(startIdx, i-1, endTime)
+            Cells(hlIdx, b_A_END).Interior.ColorIndex = LIGHT_BLUE
+            Cells(hlIdx, b_A_END).Font.ColorIndex = vbRed
         End If
 
         ' Highlight series start
         If startTimeSch <= startTimeAct Then
             If Cells(startIdx, b_ARRIVAL_TIME).Value > startTimeSch Then
-                Cells(startIdx, b_ARRIVAL_TIME).Interior.Color = vbGreen
-                Cells(startIdx, b_ARRIVAL_TIME).Font.Color = vbBlue
+                Cells(startIdx, b_ARRIVAL_TIME).Interior.ColorIndex = LIGHT_GREEN
+                Cells(startIdx, b_ARRIVAL_TIME).Font.ColorIndex = vbBlue
             Else
-                Cells(startIdx, b_S_START).Interior.Color = vbGreen
-                Cells(startIdx, b_S_START).Font.Color = vbBlue
+                Cells(startIdx, b_S_START).Interior.ColorIndex = LIGHT_GREEN
+                Cells(startIdx, b_S_START).Font.ColorIndex = vbBlue
             End If
         Else
-            Cells(startIdx, b_A_START).Interior.Color = vbGreen
-            Cells(startIdx, b_A_START).Font.Color = vbBlue
+            Cells(startIdx, b_A_START).Interior.ColorIndex = LIGHT_GREEN
+            Cells(startIdx, b_A_START).Font.ColorIndex = vbBlue
         End If
         
         ' After hours
@@ -450,9 +479,10 @@ Private Sub FindSeries()
         End IF
 
         ' Calculate totals '
-        Cells(i - 1, b_INTERPTOTAL).Value = units * Cells(i - 1, b_INTERPRATE).Value + postHoursUnits * (Cells(i - 1, b_INTERPRATE).Value + INTERPRETER_OVERCHARGE)
-        Cells(i - 1, b_SCCATOTAL).Value = units * Cells(i - 1, b_SCCARATE).Value + postHoursUnits * (Cells(i - 1, b_SCCARATE).Value + SCCA_OVERCHARGE)
+        Cells(endIdx, b_INTERPTOTAL).Value = units * Cells(endIdx, b_INTERPRATE).Value + postHoursUnits * (Cells(endIdx, b_INTERPRATE).Value + INTERPRETER_OVERCHARGE)
+        Cells(endIdx, b_SCCATOTAL).Value = units * Cells(endIdx, b_SCCARATE).Value + postHoursUnits * (Cells(endIdx, b_SCCARATE).Value + SCCA_OVERCHARGE)
 
+        i = endIdx + 1
     Loop
 
 End Sub
