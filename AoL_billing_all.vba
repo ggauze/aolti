@@ -358,12 +358,12 @@ End Function
 '
 ' Find a max time in A_END columnt between the given indexes
 '
-Function GetHighlightIndex(startIdx As Variant, endIdx As Variant, endTime as Variant) As Variant
+Function GetHighlightIndex(startIdx As Variant, endIdx As Variant, endTime As Variant) As Variant
     GetHighlightIndex = startIdx
     maxTime = Cells(startIdx, b_A_END).Value
     For i = startIdx To endIdx
         If Cells(i, b_A_END).Value = endTime Then
-            GetHighlightIndex = i    
+            GetHighlightIndex = i
             Exit Function
         Else
             If Cells(i, b_A_END).Value > maxTime Then
@@ -381,20 +381,23 @@ Private Sub FindSeries()
         startIdx = i
         startTimeSch = Round(Cells(i, b_S_START).Value, 15)
         startTimeAct = Round(Cells(i, b_A_START).Value, 15)
-        endTimeSch = FindSeriesEnd(True, i)
+        endTimeSch = Round(FindSeriesEnd(True, i), 15)
         endTimeSchIdx = i - 1
         i = startIdx
-        endTimeAct = FindSeriesEnd(False, i)
+        endTimeAct = Round(FindSeriesEnd(False, i), 15)
         endTimeActIdx = i - 1
+
+        ' Calc if arrival time is later than the scheduled start
+        isLateArrival = Cells(startIdx, b_ARRIVAL_TIME).Value > startTimeSch
+        lateArrivalPenaltyInMinutes = WorksheetFunction.RoundUp(DateDiff("n", startTimeSch, Cells(startIdx, b_ARRIVAL_TIME).Value) / 15, 0) * 15
 
         endIdx = WorksheetFunction.Max(endTimeSchIdx, endTimeActIdx)
         startTime = WorksheetFunction.Min(startTimeSch, startTimeAct)
-        endTime = WorksheetFunction.Max(endTimeSch, endTimeAct)        
+        endTime = WorksheetFunction.Max(endTimeSch, endTimeAct)
 
         ' Check if arrival time is later than the scheduled start
-        If Cells(startIdx, b_ARRIVAL_TIME).Value > startTimeSch Then
-            Duration = DateDiff("n", startTime, endTime) - _
-                       WorksheetFunction.RoundUp(DateDiff("n", startTimeSch, Cells(startIdx, b_ARRIVAL_TIME).Value) / 15, 0) * 15
+        If isLateArrival Then
+            Duration = DateDiff("n", startTime, endTime) - lateArrivalPenaltyInMinutes
             Call ConcatOrSetValue(startIdx, b_NOTES, vbRed, "LA")
         Else
             Duration = WorksheetFunction.Max(DateDiff("n", startTime, endTime), 60)
@@ -403,7 +406,7 @@ Private Sub FindSeries()
         ' Handle MIN2 '
         If Duration < 120 And Cells(startIdx, b_MIN2) Then
             Duration = 120
-            endTime = DateAdd ("n", Duration, startTime)
+            endTime = DateAdd("n", Duration, startTime)
         End If
 
         ' Handle MAX4 '
@@ -413,9 +416,20 @@ Private Sub FindSeries()
         If schDuration > 240 Then
             ' Find if there are LCLs in this series'
             actDuration = actDuration - LCLDuration(startIdx, endIdx)
+
+            ' Handle late arrival
+            If isLateArrival Then
+                actDuration = actDuration - lateArrivalPenaltyInMinutes
+            Else
+                ' Appointment started later than scheduled
+                If (startTimeSch < startTimeAct) Then
+                    actDuration = DateDiff("n", startTimeSch, endTimeAct)
+                End If
+            End If
+
             If actDuration < 240 Then
                 Duration = 240  ' MAX4 '
-                endTime = DateAdd ("n", Duration, startTime)
+                endTime = DateAdd("n", Duration, startTime)
                 Call ConcatOrSetValue(endIdx, b_NOTES, vbRed, "MAX4")
             Else
                 Duration = actDuration
@@ -427,30 +441,30 @@ Private Sub FindSeries()
         ' Calculate units'
         units = WorksheetFunction.RoundUp(Duration / 15, 0) / 4
         Cells(endIdx, b_UNITS).Value = units
-        Cells(endIdx, b_UNITS).Font.ColorIndex = vbRed
+        Cells(endIdx, b_UNITS).Font.Color = vbRed
 
         ' Highlight series end
-        If endTimeSch >= endTimeAct And endTime = endTimeSch Then
+        If endTimeSch >= endTimeAct and endTime = endTimeSch Then
             Cells(endIdx, b_S_END).Interior.ColorIndex = LIGHT_BLUE
-            Cells(endIdx, b_S_END).Font.ColorIndex = vbRed
+            Cells(endIdx, b_S_END).Font.Color = vbRed
         Else
-            hlIdx = GetHighlightIndex(startIdx, i-1, endTime)
+            hlIdx = GetHighlightIndex(startIdx, i - 1, endTime)
             Cells(hlIdx, b_A_END).Interior.ColorIndex = LIGHT_BLUE
-            Cells(hlIdx, b_A_END).Font.ColorIndex = vbRed
+            Cells(hlIdx, b_A_END).Font.Color = vbRed
         End If
 
         ' Highlight series start
         If startTimeSch <= startTimeAct Then
             If Cells(startIdx, b_ARRIVAL_TIME).Value > startTimeSch Then
                 Cells(startIdx, b_ARRIVAL_TIME).Interior.ColorIndex = LIGHT_GREEN
-                Cells(startIdx, b_ARRIVAL_TIME).Font.ColorIndex = vbBlue
+                Cells(startIdx, b_ARRIVAL_TIME).Font.Color = vbBlue
             Else
                 Cells(startIdx, b_S_START).Interior.ColorIndex = LIGHT_GREEN
-                Cells(startIdx, b_S_START).Font.ColorIndex = vbBlue
+                Cells(startIdx, b_S_START).Font.Color = vbBlue
             End If
         Else
             Cells(startIdx, b_A_START).Interior.ColorIndex = LIGHT_GREEN
-            Cells(startIdx, b_A_START).Font.ColorIndex = vbBlue
+            Cells(startIdx, b_A_START).Font.Color = vbBlue
         End If
         
         ' After hours
@@ -462,7 +476,7 @@ Private Sub FindSeries()
             dayEnd = TimeValue("5:00 pm")
     
             preMins = DateDiff("n", startTime, WorksheetFunction.Min(dayStart, endTime))
-            postMins = DateDiff("n", WorksheetFunction.Max(dayEnd, startTime), endTime)    
+            postMins = DateDiff("n", WorksheetFunction.Max(dayEnd, startTime), endTime)
 
             If (preMins > 0) Then
                 postHoursUnits = WorksheetFunction.RoundUp(preMins / 15, 0) / 4
@@ -475,8 +489,8 @@ Private Sub FindSeries()
 
         units = units - postHoursUnits
         If postHoursUnits > 0 Then
-            Call ConcatOrSetValue(i-1, b_TYPE_OF_PAY, vbRed, postHoursUnits)
-        End IF
+            Call ConcatOrSetValue(i - 1, b_TYPE_OF_PAY, vbRed, postHoursUnits)
+        End If
 
         ' Calculate totals '
         Cells(endIdx, b_INTERPTOTAL).Value = units * Cells(endIdx, b_INTERPRATE).Value + postHoursUnits * (Cells(endIdx, b_INTERPRATE).Value + INTERPRETER_OVERCHARGE)
@@ -498,5 +512,7 @@ Public Sub RunAOLTIBilling()
     End If
 
 End Sub
+
+
 
 
