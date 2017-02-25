@@ -422,7 +422,7 @@ Private Sub FindSeries()
                 actDuration = actDuration - lateArrivalPenaltyInMinutes
             Else
                 ' Appointment started later than scheduled
-                If (startTimeSch < startTimeAct) Then
+                If startTimeSch < startTimeAct Then
                     actDuration = DateDiff("n", startTimeSch, endTimeAct)
                 End If
             End If
