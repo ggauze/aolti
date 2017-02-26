@@ -33,17 +33,20 @@ Public Const b_A_MIN = 14
 Public Const b_DEPARTMENT = 15
 Public Const b_TYPE = 16
 Public Const b_NOTES = 17
-Public Const b_TYPE_OF_PAY = 18
-Public Const b_UNITS = 19
+Public Const b_AH_UNITS = 18
+Public Const b_RH_UNITS = 19
 Public Const b_INTERPRATE = 20
-Public Const b_SCCARATE = 21
-Public Const b_INTERPTOTAL = 22
-Public Const b_SCCATOTAL = 23
-Public Const b_REASON_FOR_CHANGE = 24
-Public Const b_CANC_REASON = 25
+Public Const b_AH_FEE_INTERP = 21
+Public Const b_RH_FEE_INTERP = 22
+Public Const b_INTERPTOTAL = 23
+Public Const b_AH_FEE_SCCA = 24
+Public Const b_RH_FEE_SCCA = 25
+Public Const b_SCCATOTAL = 26
+Public Const b_REASON_FOR_CHANGE = 27
+Public Const b_CANC_REASON = 28
 
 ' internal use columns '
-Public Const b_MIN2 = 26
+Public Const b_MIN2 = 29
 
 
 ' Intepreter table'
@@ -92,14 +95,20 @@ Private Sub GlobalInit()
     Columns(b_A_END).NumberFormat = "h:mm AM/PM"
 
     ' !!! ATTENTION: The following line makes assumption about column locations in the table '
-    ' !!! It clears all contents of the columns betwen TypeOfPay and SCCATotal, inclusively
+    ' !!! It clears all contents of the columns betwen AH Units and SCCATotal, inclusively
 
-    Range(Cells(2, b_TYPE_OF_PAY), Cells(LastRow, b_SCCATOTAL)).Clear
+    Range(Cells(2, b_AH_UNITS), Cells(LastRow, b_SCCATOTAL)).Clear
 
-    Columns(b_INTERPRATE).NumberFormat = "$#,##0.00"
-    Columns(b_INTERPTOTAL).NumberFormat = "$#,##0.00"
-    Columns(b_SCCARATE).NumberFormat = "$#,##0.00"
-    Columns(b_SCCATOTAL).NumberFormat = "$#,##0.00"
+    ' !!! ATTENTION: The following line makes assumption about column locations in the table '
+    ' !!! It sets format to $ for all the columns betwen AH Fee Interp and SCCATotal, inclusively
+
+    Range(Cells(2, b_AH_FEE_INTERP), Cells(LastRow, b_SCCATOTAL)).NumberFormat = "$#,##0.00"
+
+
+    'Columns(b_INTERPRATE).NumberFormat = "$#,##0.00"
+    'Columns(b_INTERPTOTAL).NumberFormat = "$#,##0.00"
+    'Columns(b_SCCARATE).NumberFormat = "$#,##0.00"
+    'Columns(b_SCCATOTAL).NumberFormat = "$#,##0.00"
 
     ' internal use columns
     Cells(1, b_MIN2).Value = "Is Min2"
@@ -135,21 +144,24 @@ End Function
 ' O - 15 - Department
 ' P - 16 - Type
 ' Q - 17 - Notes
-' R - 18 - Type of Pay
-' S - 19 - Units
+' R - 18 - AH Units
+' S - 19 - RH Units
 ' T - 20 - InterpRate
-' U - 21 - SCCARate
-' V - 22 - InterpTotal
-' W - 23 - SCCATotal
-' X - 24 - Reason for Change
-' Z - 25 - Canc Reason
+' U - 21 - AH Fee Interp
+' V - 22 - RH Fee Interp
+' W - 23 - InterpTotal
+' X - 24 - AH Fee SCCA
+' Y - 25 - RH Fee SCCA
+' Z - 26 - SCCATotal
+' AA - 27 - Reason for Change
+' AB - 28 - Canc Reason
 
 Function ValidateCaption(titles As Variant) As Boolean
     ' Validate each value
     Dim i As Long
     For i = LBound(titles) To UBound(titles)
         If LCase(Cells(1, i + 1).Value) <> LCase(titles(i)) Then
-            MsgBox ("Column " & i & " is not " & titles(i))
+            MsgBox ("Cell " & Cells(1,i+1).Address  & " is expected to be " & titles(i) & " but instead it is " & Cells(1, i + 1).Value)
             ValidateCaption = False
             Exit Function
         End If
@@ -159,7 +171,9 @@ End Function
 
 Function ValidateBillingCaption() As Boolean
     Dim titles As Variant
-    titles = Array("Interpreter", "Status", "Last Name", "First Name", "Language", "U Number", "Date", "S Start", "S End", "S Min", "Arrival Time", "A Start", "A End", "A Min", "Department", "Type", "Notes", "Type of Pay", "Units", "InterpRate", "SCCARate", "InterpTotal", "SCCATotal", "Reason for Change", "Canc Reason")
+    titles = Array("Interpreter", "Status", "Last Name", "First Name", "Language", "U Number", "Date", "S Start", "S End", "S Min", _
+                   "Arrival Time", "A Start", "A End", "A Min", "Department", "Type", "Notes", "AH Units", "RH Units", "InterpRate", _
+                   "AH Fee Interp", "RH Fee Interp", "InterpTotal", "AH Fee SCCA", "RH Fee SCCA", "SCCATotal", "Reason for Change", "Canc Reason")
     ValidateBillingCaption = ValidateCaption(titles)
 End Function
 
@@ -237,12 +251,6 @@ Private Sub InitRatesColumn()
                     Call SetValue(i, b_NOTES, vbRed, "MIN2")
                     Cells(i, b_MIN2).Value = True
                 End If
-            End If
-            ' Set SCCA rate value while we're on it
-            If LCase(Cells(i, b_STATUS)) = "dnc" Then
-                Cells(i, b_SCCARATE).Value = 0
-            Else
-                Cells(i, b_SCCARATE).Value = SCCA_RATE
             End If
             
             i = i + 1
@@ -328,7 +336,6 @@ Function FindSeriesEnd(isScheduled As Variant, ByRef startIdx As Variant) As Var
                 End If
 
                 Cells(i - 1, b_INTERPRATE).Clear
-                Cells(i - 1, b_SCCARATE).Clear
 
             Else
                 Exit Do
@@ -440,8 +447,8 @@ Private Sub FindSeries()
 
         ' Calculate units'
         units = WorksheetFunction.RoundUp(Duration / 15, 0) / 4
-        Cells(endIdx, b_UNITS).Value = units
-        Cells(endIdx, b_UNITS).Font.Color = vbRed
+        Cells(endIdx, b_RH_UNITS).Value = units
+        Cells(endIdx, b_RH_UNITS).Font.Color = vbRed
 
         ' Highlight series end
         If endTimeSch >= endTimeAct and endTime = endTimeSch Then
@@ -489,12 +496,23 @@ Private Sub FindSeries()
 
         units = units - postHoursUnits
         If postHoursUnits > 0 Then
-            Call ConcatOrSetValue(i - 1, b_TYPE_OF_PAY, vbRed, postHoursUnits)
+            Call ConcatOrSetValue(endIdx, b_AH_UNITS, vbRed, postHoursUnits)
+            Cells(endIdx, b_AH_FEE_INTERP).Value = postHoursUnits * (Cells(endIdx, b_INTERPRATE).Value + INTERPRETER_OVERCHARGE)
+            If LCase(Cells(i, b_STATUS)) <> "dnc" Then
+                Cells(endIdx, b_AH_FEE_SCCA).Value = postHoursUnits * (SCCA_RATE + SCCA_OVERCHARGE)
+            End If
         End If
 
         ' Calculate totals '
-        Cells(endIdx, b_INTERPTOTAL).Value = units * Cells(endIdx, b_INTERPRATE).Value + postHoursUnits * (Cells(endIdx, b_INTERPRATE).Value + INTERPRETER_OVERCHARGE)
-        Cells(endIdx, b_SCCATOTAL).Value = units * Cells(endIdx, b_SCCARATE).Value + postHoursUnits * (Cells(endIdx, b_SCCARATE).Value + SCCA_OVERCHARGE)
+        Cells(endIdx, b_RH_FEE_INTERP).Value = units * Cells(endIdx, b_INTERPRATE).Value
+        Cells(endIdx, b_INTERPTOTAL).Value = Cells(endIdx, b_RH_FEE_INTERP).Value + Cells(endIdx, b_AH_FEE_INTERP).Value
+
+        If LCase(Cells(i, b_STATUS)) <> "dnc" Then
+            Cells(endIdx, b_RH_FEE_SCCA).Value = units * SCCA_RATE
+            Cells(endIdx, b_SCCATOTAL).Value = Cells(endIdx, b_RH_FEE_SCCA).Value + Cells(endIdx, b_AH_FEE_SCCA).Value            
+        Else
+            Cells(endIdx, b_SCCATOTAL).Value = 0
+        End IF
 
         i = endIdx + 1
     Loop
