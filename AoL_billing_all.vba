@@ -33,14 +33,14 @@ Public Const b_A_MIN = 14
 Public Const b_DEPARTMENT = 15
 Public Const b_TYPE = 16
 Public Const b_NOTES = 17
-Public Const b_AH_UNITS = 18
-Public Const b_RH_UNITS = 19
+Public Const b_RH_UNITS = 18
+Public Const b_AH_UNITS = 19
 Public Const b_INTERPRATE = 20
-Public Const b_AH_FEE_INTERP = 21
-Public Const b_RH_FEE_INTERP = 22
+Public Const b_RH_FEE_INTERP = 21
+Public Const b_AH_FEE_INTERP = 22
 Public Const b_INTERPTOTAL = 23
-Public Const b_AH_FEE_SCCA = 24
-Public Const b_RH_FEE_SCCA = 25
+Public Const b_RH_FEE_SCCA = 24
+Public Const b_AH_FEE_SCCA = 25
 Public Const b_SCCATOTAL = 26
 Public Const b_REASON_FOR_CHANGE = 27
 Public Const b_CANC_REASON = 28
@@ -95,14 +95,14 @@ Private Sub GlobalInit()
     Columns(b_A_END).NumberFormat = "h:mm AM/PM"
 
     ' !!! ATTENTION: The following line makes assumption about column locations in the table '
-    ' !!! It clears all contents of the columns betwen AH Units and SCCATotal, inclusively
+    ' !!! It clears all contents of the columns betwen RH Units and SCCATotal, inclusively
 
-    Range(Cells(2, b_AH_UNITS), Cells(LastRow, b_SCCATOTAL)).Clear
+    Range(Cells(2, b_RH_UNITS), Cells(LastRow, b_SCCATOTAL)).Clear
 
     ' !!! ATTENTION: The following line makes assumption about column locations in the table '
-    ' !!! It sets format to $ for all the columns betwen AH Fee Interp and SCCATotal, inclusively
+    ' !!! It sets format to $ for all the columns betwen Interp RH Fee and SCCATotal, inclusively
 
-    Range(Cells(2, b_AH_FEE_INTERP), Cells(LastRow, b_SCCATOTAL)).NumberFormat = "$#,##0.00"
+    Range(Cells(2, b_RH_FEE_INTERP), Cells(LastRow, b_SCCATOTAL)).NumberFormat = "$#,##0.00"
 
 
     'Columns(b_INTERPRATE).NumberFormat = "$#,##0.00"
@@ -144,14 +144,14 @@ End Function
 ' O - 15 - Department
 ' P - 16 - Type
 ' Q - 17 - Notes
-' R - 18 - AH Units
-' S - 19 - RH Units
+' R - 18 - RH Units
+' S - 19 - AH Units
 ' T - 20 - InterpRate
-' U - 21 - AH Fee Interp
-' V - 22 - RH Fee Interp
+' U - 21 - Interp RH Fee
+' V - 22 - Interp AH Fee
 ' W - 23 - InterpTotal
-' X - 24 - AH Fee SCCA
-' Y - 25 - RH Fee SCCA
+' X - 24 - SCCA RH Fee
+' Y - 25 - SCCA AH Fee
 ' Z - 26 - SCCATotal
 ' AA - 27 - Reason for Change
 ' AB - 28 - Canc Reason
@@ -161,7 +161,7 @@ Function ValidateCaption(titles As Variant) As Boolean
     Dim i As Long
     For i = LBound(titles) To UBound(titles)
         If LCase(Cells(1, i + 1).Value) <> LCase(titles(i)) Then
-            MsgBox ("Cell " & Cells(1,i+1).Address  & " is expected to be " & titles(i) & " but instead it is " & Cells(1, i + 1).Value)
+            MsgBox ("Cell " & Cells(1, i + 1).Address & " is expected to be " & titles(i) & " but instead it is " & Cells(1, i + 1).Value)
             ValidateCaption = False
             Exit Function
         End If
@@ -172,8 +172,8 @@ End Function
 Function ValidateBillingCaption() As Boolean
     Dim titles As Variant
     titles = Array("Interpreter", "Status", "Last Name", "First Name", "Language", "U Number", "Date", "S Start", "S End", "S Min", _
-                   "Arrival Time", "A Start", "A End", "A Min", "Department", "Type", "Notes", "AH Units", "RH Units", "InterpRate", _
-                   "AH Fee Interp", "RH Fee Interp", "InterpTotal", "AH Fee SCCA", "RH Fee SCCA", "SCCATotal", "Reason for Change", "Canc Reason")
+                   "Arrival Time", "A Start", "A End", "A Min", "Department", "Type", "Notes", "RH Units", "AH Units", "InterpRate", _
+                   "Interp RH Fee", "Interp AH Fee", "InterpTotal", "SCCA RH Fee", "SCCA AH Fee", "SCCATotal", "Reason for Change", "Canc Reason")
     ValidateBillingCaption = ValidateCaption(titles)
 End Function
 
@@ -251,6 +251,8 @@ Private Sub InitRatesColumn()
                     Call SetValue(i, b_NOTES, vbRed, "MIN2")
                     Cells(i, b_MIN2).Value = True
                 End If
+            Else
+                Cells(i, b_INTERPRATE).Interior.Color = vbRed
             End If
             
             i = i + 1
@@ -445,13 +447,8 @@ Private Sub FindSeries()
 
         End If
 
-        ' Calculate units'
-        units = WorksheetFunction.RoundUp(Duration / 15, 0) / 4
-        Cells(endIdx, b_RH_UNITS).Value = units
-        Cells(endIdx, b_RH_UNITS).Font.Color = vbRed
-
         ' Highlight series end
-        If endTimeSch >= endTimeAct and endTime = endTimeSch Then
+        If endTimeSch >= endTimeAct And endTime = endTimeSch Then
             Cells(endIdx, b_S_END).Interior.ColorIndex = LIGHT_BLUE
             Cells(endIdx, b_S_END).Font.Color = vbRed
         Else
@@ -474,6 +471,9 @@ Private Sub FindSeries()
             Cells(startIdx, b_A_START).Font.Color = vbBlue
         End If
         
+        ' Calculate units'
+        units = WorksheetFunction.RoundUp(Duration / 15, 0) / 4
+
         ' After hours
         postHoursUnits = 0
         If IsWeekend(Cells(startIdx, b_DATE).Value) Then
@@ -495,6 +495,8 @@ Private Sub FindSeries()
         End If
 
         units = units - postHoursUnits
+        Cells(endIdx, b_RH_UNITS).Value = units
+        Cells(endIdx, b_RH_UNITS).Font.Color = vbRed
         If postHoursUnits > 0 Then
             Call ConcatOrSetValue(endIdx, b_AH_UNITS, vbRed, postHoursUnits)
             Cells(endIdx, b_AH_FEE_INTERP).Value = postHoursUnits * (Cells(endIdx, b_INTERPRATE).Value + INTERPRETER_OVERCHARGE)
@@ -509,10 +511,17 @@ Private Sub FindSeries()
 
         If LCase(Cells(i, b_STATUS)) <> "dnc" Then
             Cells(endIdx, b_RH_FEE_SCCA).Value = units * SCCA_RATE
-            Cells(endIdx, b_SCCATOTAL).Value = Cells(endIdx, b_RH_FEE_SCCA).Value + Cells(endIdx, b_AH_FEE_SCCA).Value            
+            Cells(endIdx, b_SCCATOTAL).Value = Cells(endIdx, b_RH_FEE_SCCA).Value + Cells(endIdx, b_AH_FEE_SCCA).Value
         Else
             Cells(endIdx, b_SCCATOTAL).Value = 0
-        End IF
+        End If
+
+        If postHoursUnits = 0 Then
+            Cells(endIdx, b_AH_FEE_INTERP).Value = "-"
+            Cells(endIdx, b_AH_FEE_INTERP).HorizontalAlignment = xlCenter
+            Cells(endIdx, b_AH_FEE_SCCA).Value = "-"
+            Cells(endIdx, b_AH_FEE_SCCA).HorizontalAlignment = xlCenter
+        End If
 
         i = endIdx + 1
     Loop
@@ -530,7 +539,3 @@ Public Sub RunAOLTIBilling()
     End If
 
 End Sub
-
-
-
-
