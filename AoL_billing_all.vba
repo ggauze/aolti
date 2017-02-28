@@ -516,12 +516,20 @@ Private Sub FindSeries()
             Cells(endIdx, b_SCCATOTAL).Value = 0
         End If
 
+        ' Put "-" in empty fee cells
         If postHoursUnits = 0 Then
             Cells(endIdx, b_AH_FEE_INTERP).Value = "-"
             Cells(endIdx, b_AH_FEE_INTERP).HorizontalAlignment = xlCenter
             Cells(endIdx, b_AH_FEE_SCCA).Value = "-"
             Cells(endIdx, b_AH_FEE_SCCA).HorizontalAlignment = xlCenter
         End If
+
+        ' Underline units and fees
+        With Range(Cells(endIdx, b_RH_UNITS), Cells(endIdx, b_SCCATOTAL)).Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .Weight = xlThin
+            .Color = vbBlack
+        End With
 
         i = endIdx + 1
     Loop
