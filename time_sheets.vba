@@ -6,7 +6,7 @@
 
 Public Const IntepreterRatesFile = "T:\!Interpreter Management\!Operating Procedures\SCCA\Billing\Billing Macro\SCCA Interpreter Rates List.xlsx"
 
-' Public Const IntepreterRatesFile = "C:\Users\Sergei\Dropbox\Karla\Billing\SCCA Interpreter Rates List.xlsx"
+' Public Const IntepreterRatesFile = "C:\Users\Sergei\Downloads\SCCA Interpreter Rates List.xlsx"
 
 ' Modify the following constants if column order is changed'
 
@@ -49,13 +49,43 @@ Public Const t_LANGUAGE = 17
 Public Const TIME_TABLE_TEMPLATE = "TimeSheetTemplate"
 Public Const TIME_TABLE = "TimeSheet"
 Public Const MASTER = "From Master"
-Public Const MASTER_COPY = "From Master Copy"
+Public Const MASTER_COPY = "Validation Report"
 
 ' Global variables
 Dim IRates() As Variant
 Dim LastRow As Variant
 Dim TimeSheet As Variant
 Dim SavePath As String
+Dim FileNamePrefix As String
+Dim InterpCount As Integer
+
+'Get number of days in the month
+Function dhDaysInMonth(Optional dtmDate As Date = 0) As Integer
+    ' Return the number of days in the specified month.
+    If dtmDate = 0 Then
+        ' Did the caller pass in a date? If not, use
+        ' the current date.
+        dtmDate = Date
+    End If
+    dhDaysInMonth = DateSerial(Year(dtmDate), _
+     Month(dtmDate) + 1, 1) - _
+     DateSerial(Year(dtmDate), Month(dtmDate), 1)
+End Function
+
+Private Sub Workbook_BeforeClose(Cancel As Boolean)
+    Dim x As Long, y As Long
+        
+        For x = 2 To Cells(Rows.Count, "A").End(xlUp).Row
+            y = Application.CountA(Range(Cells(x, "A"), Cells(x, "J")))
+            If y < 10 Then
+                MsgBox "You need to fill out all of the required cells in row " & x, vbOKOnly + vbCritical, "Information Required"
+                Cells(x, "B").Activate
+                Cancel = True
+                Exit Sub
+            End If
+        Next x
+        
+End Sub
 
 
 ' Global initializaiton
@@ -64,7 +94,7 @@ Private Sub MasterInit()
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
     Application.EnableEvents = False
-    Application.Calculation = xlManual
+    Application.Calculation = xlAutomatic
 
     ' Create a template sheet for interpreter time table
     
@@ -104,9 +134,23 @@ Private Sub MasterInit()
         .Sort key1:=Columns(m_INTERPRETER), key2:=Columns(m_DATE), key3:=Columns(m_U_NUMBER), _
                order1:=xlAscending, Header:=xlYes, MatchCase:=False
        
-    LastRow = Range("A" & Rows.Count).End(xlUp).Row
+    LastRow = Range("B" & Rows.Count).End(xlUp).Row
     SavePath = ActiveWorkbook.Path & "\"
-
+    
+    'Calculate the pay period range
+    Dim StartDate As Date
+    StartDate = Cells(2, m_DATE).Value
+    
+    If Day(StartDate) < 16 Then
+        StartDay = 1
+        EndDay = 15
+    Else
+        StartDay = 16
+        EndDay = dhDaysInMonth(StartDate)
+    End If
+    
+    FileNamePrefix = MonthName(Month(StartDate)) + " " + CStr(StartDay) + " - " + CStr(EndDay) + " "
+        
 End Sub
 
 Private Sub CopyValuesToTableSheet(masterIdx As Variant, ttIdx As Variant)
@@ -154,10 +198,10 @@ Private Sub ValidateInterpreterNames()
     interpIdx = -1
 
     Do While i <= LastRow
-        interpName = Cells(i, m_INTERPRETER).Value
-        dept = Cells(i, m_DEPARTMENT).Value
+        interpName = Trim(Cells(i, m_INTERPRETER).Value)
+        dept = Trim(Cells(i, m_DEPARTMENT).Value)
         interpIdx = FindIntepreterIdx(interpName, dept, interpIdx)
-        Do While i <= LastRow And Cells(i, m_INTERPRETER).Value = interpName
+        Do While i <= LastRow And Trim(Cells(i, m_INTERPRETER).Value) = interpName
             If (interpIdx = -1) Then
                 Cells(i, m_INTERPRETER).Font.Color = vbRed
             End If
@@ -173,14 +217,14 @@ Function HandleNextInterpreter(startIdx As Variant) As Variant
     i = startIdx
     j = 2
 
-    interpreter = Cells(i, m_INTERPRETER).Value
+    interpreter = Trim(Cells(i, m_INTERPRETER).Value)
     nextInterpreter = interpreter
 
     ' Copy the interpreter values
     Do While i <= LastRow
         If interpreter = nextInterpreter Then
-            Status = Cells(i, m_STATUS).Value
-            If Status <> "CLD" Then
+            Status = LCase(Cells(i, m_STATUS).Value)
+            If Status <> "cld" And Status <> "ins" Then
                 Call CopyValuesToTableSheet(i, j)
                 j = j + 1
             End If
@@ -188,36 +232,39 @@ Function HandleNextInterpreter(startIdx As Variant) As Variant
             Exit Do
         End If
         i = i + 1
-        nextInterpreter = Cells(i, m_INTERPRETER).Value
+        nextInterpreter = Trim(Cells(i, m_INTERPRETER).Value)
     Loop
     
-    ' Copy TimeSheet to a new workbook
-    TimeSheet.Copy
-    
-    ' Border style
-    Range(Cells(2, t_ARRIVAL), Cells(j - 1, t_NOTES)).Borders.LineStyle = xlContinuous
-    
-    ' Freeze first row
-    Rows(1).Select
-    ActiveWindow.FreezePanes = True
-    
-    ' Lock some cells
-    ActiveSheet.Protect UserInterfaceOnly:=True
-    Range(Cells(2, t_ARRIVAL), Cells(j - 1, t_NOTES)).Locked = False
-    
-    ActiveSheet.EnableCalculation = True
-    
-    Columns.AutoFit
-    Columns(t_INTERPRETER).Hidden = True
-    Columns(t_LANGUAGE).Hidden = True
-    
-    ' Save TimeTable sheet to a separate file
-    Fname = GetFileName(startIdx, i - 1)
-    With ActiveWorkbook
-        .SaveAs Filename:=SavePath & Fname
-        .Close
-    End With
-    
+    ' Only create timesheet for non-empty data
+    If j > 2 Then
+        ' Copy TimeSheet to a new workbook
+        TimeSheet.Copy
+        
+        ' Border style
+        Range(Cells(2, t_ARRIVAL), Cells(j - 1, t_NOTES)).Borders.LineStyle = xlContinuous
+        
+        ' Freeze first row
+        Rows("2:2").Select
+        ActiveWindow.FreezePanes = True
+        
+        ' Lock some cells
+        ActiveSheet.Protect UserInterfaceOnly:=True
+        Range(Cells(2, t_ARRIVAL), Cells(j - 1, t_NOTES)).Locked = False
+        
+        ActiveSheet.EnableCalculation = True
+        
+        Columns.AutoFit
+        Columns(t_INTERPRETER).Hidden = True
+        Columns(t_LANGUAGE).Hidden = True
+        
+        ' Save TimeTable sheet to a separate file
+        Fname = FileNamePrefix + interpreter + ".xlsx"
+        With ActiveWorkbook
+            .SaveAs Filename:=SavePath & Fname
+            .Close
+        End With
+        InterpCount = InterpCount + 1
+    End If
 
     HandleNextInterpreter = i
 End Function
@@ -291,6 +338,8 @@ End Sub
 Private Sub ProcessMaster()
 
     i = 2
+    InterpCount = 0
+    
     Do While i <= LastRow
         If Cells(i, m_INTERPRETER).Font.Color <> vbRed Then
             ' Create a working copy of the current time sheet
@@ -315,7 +364,10 @@ End Sub
 Private Sub Cleanup()
 
     Sheets(TIME_TABLE_TEMPLATE).Delete
-    Sheets(MASTER_COPY).Delete
+    
+    ' Uncomment the following if you want the mastre copy to be deleted
+    
+    ' Sheets(MASTER_COPY).Delete
     
 End Sub
 Public Sub CreateTimeSheets()
@@ -327,7 +379,7 @@ Public Sub CreateTimeSheets()
         Call FindSeries
         Call ProcessMaster
         Call Cleanup
-        MsgBox "Timesheets created in " & SavePath
+        MsgBox CStr(InterpCount) & " timesheets created in " & SavePath
     End If
 
 End Sub
