@@ -100,7 +100,8 @@ Private Sub MasterInit()
     
     Dim titles As Variant
     titles = Array("Last Name", "First Name", "U Number", "Date", "Department", "Status", "S Start", "S End", "S Min", _
-                   "Arrival", "A Start", "A End", "A Min", "LCL on site only", "Interpreter Notes", "Interpreter", "Language")
+                   "Arrival     ", "A Start     ", "A End       ", "A Min", "LCL on site only", "Interpreter Notes", _
+                   "Interpreter", "Language")
     
     ActiveWorkbook.Sheets.Add
     ActiveSheet.Name = TIME_TABLE_TEMPLATE
@@ -182,8 +183,8 @@ Private Sub CopyValuesToTableSheet(masterIdx As Variant, ttIdx As Variant)
             TimeSheet.Cells(ttIdx, t_ARRIVAL).Interior.ColorIndex = 40
             TimeSheet.Cells(ttIdx, t_A_START).Interior.ColorIndex = 44
             TimeSheet.Cells(ttIdx, t_A_END).Interior.ColorIndex = 44
-            TimeSheet.Cells(ttIdx, t_A_MIN).Formula = "=(" & TimeSheet.Cells(ttIdx, t_A_END).Address & "-" _
-                                                           & TimeSheet.Cells(ttIdx, t_A_START).Address & ")*1440"
+            TimeSheet.Cells(ttIdx, t_A_MIN).Formula = "=(" & TimeSheet.Cells(ttIdx, t_A_END).Address(False, False) & "-" _
+                                                           & TimeSheet.Cells(ttIdx, t_A_START).Address(False, False) & ")*1440"
             
             TimeSheet.Cells(ttIdx, t_LCL).Interior.ColorIndex = 15
             TimeSheet.Cells(ttIdx, t_NOTES).Interior.ColorIndex = 15
@@ -383,4 +384,3 @@ Public Sub CreateTimeSheets()
     End If
 
 End Sub
-
