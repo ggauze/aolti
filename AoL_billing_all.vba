@@ -1,6 +1,11 @@
-' Change this as needed
+'------------------------
+' RunAOLTIBilling
+'------------------------
 
-Public Const IntepreterRatesFile = "C:/Users/sgringauze.ISTREAMPLANET/Dropbox/Karla/Billing/SCCA Interpreter Rates List.xlsx"
+' Change this as needed [last updated 3/24/17]
+
+Public Const IntepreterRatesFile = "T:\!Interpreter Management\!Operating Procedures\SCCA\Billing\Billing Macro\SCCA Interpreter Rates List.xlsx"
+' Public Const IntepreterRatesFile = "C:\Users\Sergei\Downloads\SCCA Interpreter Rates List.xlsx"
 
 ' Some constants - modify as needed
 Public Const SCCA_RATE = 48
@@ -68,7 +73,7 @@ Private Sub GlobalInit()
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
     Application.EnableEvents = False
-    Application.Calculation = xlManual
+    Application.Calculation = xlAutomatic
 
     ' Billing sheet initialization
 
@@ -102,7 +107,7 @@ Private Sub GlobalInit()
     ' !!! ATTENTION: The following line makes assumption about column locations in the table '
     ' !!! It sets format to $ for all the columns betwen Interp RH Fee and SCCATotal, inclusively
 
-    Range(Cells(2, b_RH_FEE_INTERP), Cells(LastRow, b_SCCATOTAL)).NumberFormat = "$#,##0.00"
+    Range(Cells(2, b_INTERPRATE), Cells(LastRow, b_SCCATOTAL)).NumberFormat = "_($* #,##0.00_);_($* (#,##0.00);_($* "" - ""??_);_(@_)" ' "$#,##0.00"
 
 
     'Columns(b_INTERPRATE).NumberFormat = "$#,##0.00"
@@ -161,7 +166,7 @@ Function ValidateCaption(titles As Variant) As Boolean
     Dim i As Long
     For i = LBound(titles) To UBound(titles)
         If LCase(Cells(1, i + 1).Value) <> LCase(titles(i)) Then
-            MsgBox ("Cell " & Cells(1, i + 1).Address & " is expected to be " & titles(i) & " but instead it is " & Cells(1, i + 1).Value)
+            MsgBox ("Cell " & Cells(1, i + 1).Address(False, False) & " is expected to be " & titles(i) & " but instead it is " & Cells(1, i + 1).Value)
             ValidateCaption = False
             Exit Function
         End If
@@ -178,19 +183,19 @@ Function ValidateBillingCaption() As Boolean
 End Function
 
 ' Load IntepreterRatesFile and import it to the rates array
-Function LoadInterpreterRates() As Boolean
+Function LoadInterpreterRates(file As String) As Boolean
     On Error Resume Next
 
-    If Len(Dir(IntepreterRatesFile)) = 0 Then
-          MsgBox "File " & IntepreterRatesFile & " does not exist"
+    If Len(Dir(file)) = 0 Then
+          MsgBox "File " & file & " does not exist"
           LoadInterpreterRates = False
           Exit Function
     Else
          On Error Resume Next
-         Set WB = Workbooks.Open(IntepreterRatesFile)
+         Set WB = Workbooks.Open(file)
          On Error GoTo 0
          If WB Is Nothing Then
-            MsgBox IntepreterRatesFile & " is invalid, can't load", vbCritical
+            MsgBox file & " is invalid, can't load", vbCritical
             LoadInterpreterRates = False
             Exit Function
          End If
@@ -248,7 +253,6 @@ Private Sub InitRatesColumn()
             If (interpIdx <> -1) Then
                 Cells(i, b_INTERPRATE).Value = IRates(interpIdx, i_RATE)
                 If Not IsEmpty(IRates(interpIdx, i_2HRMIN)) Then
-                    Call SetValue(i, b_NOTES, vbRed, "MIN2")
                     Cells(i, b_MIN2).Value = True
                 End If
             Else
@@ -316,7 +320,6 @@ Function FindSeriesEnd(isScheduled As Variant, ByRef startIdx As Variant) As Var
             
             ' First, calculate possible overlaps
             If DateDiff("n", endTime, nextStartTime) < 0 Then
-                Call ConcatOrSetValue(i, b_NOTES, vbGreen, "OVERLAP" + NOTE_SUFFIX)
                 nextStartTime = endTime
             End If
             
@@ -328,10 +331,6 @@ Function FindSeriesEnd(isScheduled As Variant, ByRef startIdx As Variant) As Var
 
             If Gap <= 60 Then  ' if wait time is <= 60, this appointment is a part of the series'
                 newEndTime = Cells(i, END_TIME).Value
-                
-                If Gap > 15 Then
-                    Call ConcatOrSetValue(i, b_NOTES, vbGreen, "WT" + NOTE_SUFFIX)
-                End If
                 
                 If newEndTime > endTime Then
                    endTime = newEndTime
@@ -397,43 +396,37 @@ Private Sub FindSeries()
         endTimeActIdx = i - 1
 
         ' Calc if arrival time is later than the scheduled start
-        isLateArrival = Cells(startIdx, b_ARRIVAL_TIME).Value > startTimeSch
+        isLateArrival = Round(Cells(startIdx, b_ARRIVAL_TIME).Value, 15) > startTimeSch
         lateArrivalPenaltyInMinutes = WorksheetFunction.RoundUp(DateDiff("n", startTimeSch, Cells(startIdx, b_ARRIVAL_TIME).Value) / 15, 0) * 15
 
         endIdx = WorksheetFunction.Max(endTimeSchIdx, endTimeActIdx)
         startTime = WorksheetFunction.Min(startTimeSch, startTimeAct)
         endTime = WorksheetFunction.Max(endTimeSch, endTimeAct)
 
-        ' Check if arrival time is later than the scheduled start
-        If isLateArrival Then
-            Duration = DateDiff("n", startTime, endTime) - lateArrivalPenaltyInMinutes
-            Call ConcatOrSetValue(startIdx, b_NOTES, vbRed, "LA")
-        Else
-            Duration = WorksheetFunction.Max(DateDiff("n", startTime, endTime), 60)
-        End If
+        Duration = WorksheetFunction.Max(DateDiff("n", startTime, endTime), 60)
         
-        ' Handle MIN2 '
+        ' Handle MIN2
         If Duration < 120 And Cells(startIdx, b_MIN2) Then
-            Duration = 120
-            endTime = DateAdd("n", Duration, startTime)
+            ' Check if there is no other series for this interpreter that starts in less than an hour
+            If Cells(i, b_INTERPRETER).Value <> Cells(startIdx, b_INTERPRETER).Value Or _
+               DateDiff("n", endTime, WorksheetFunction.Min(Cells(i, b_S_START).Value, Cells(i, b_A_START).Value)) >= 60 Then
+                Duration = 120
+                endTime = DateAdd("n", Duration, startTime)
+                Call ConcatOrSetValue(startIdx, b_NOTES, vbRed, "MIN2")
+            End If
         End If
 
-        ' Handle MAX4 '
+        ' Handle MAX4
         schDuration = DateDiff("n", startTimeSch, endTimeSch)
         actDuration = DateDiff("n", startTimeAct, endTimeAct)
 
         If schDuration > 240 Then
-            ' Find if there are LCLs in this series'
+            ' Find if there are LCLs in this series
             actDuration = actDuration - LCLDuration(startIdx, endIdx)
 
-            ' Handle late arrival
-            If isLateArrival Then
-                actDuration = actDuration - lateArrivalPenaltyInMinutes
-            Else
-                ' Appointment started later than scheduled
-                If startTimeSch < startTimeAct Then
-                    actDuration = DateDiff("n", startTimeSch, endTimeAct)
-                End If
+            ' Appointment started later than scheduled
+            If startTimeSch < startTimeAct Then
+                actDuration = DateDiff("n", startTimeSch, endTimeAct)
             End If
 
             If actDuration < 240 Then
@@ -445,6 +438,12 @@ Private Sub FindSeries()
                 endTime = endTimeAct
             End If
 
+        End If
+        
+        ' Handle late arrival
+        If isLateArrival Then
+            Duration = Duration - lateArrivalPenaltyInMinutes
+            Call ConcatOrSetValue(startIdx, b_NOTES, vbRed, "LA")
         End If
 
         ' Highlight series end
@@ -459,7 +458,7 @@ Private Sub FindSeries()
 
         ' Highlight series start
         If startTimeSch <= startTimeAct Then
-            If Cells(startIdx, b_ARRIVAL_TIME).Value > startTimeSch Then
+            If isLateArrivial Then
                 Cells(startIdx, b_ARRIVAL_TIME).Interior.ColorIndex = LIGHT_GREEN
                 Cells(startIdx, b_ARRIVAL_TIME).Font.Color = vbBlue
             Else
@@ -505,24 +504,25 @@ Private Sub FindSeries()
             End If
         End If
 
-        ' Calculate totals '
-        Cells(endIdx, b_RH_FEE_INTERP).Value = units * Cells(endIdx, b_INTERPRATE).Value
-        Cells(endIdx, b_INTERPTOTAL).Value = Cells(endIdx, b_RH_FEE_INTERP).Value + Cells(endIdx, b_AH_FEE_INTERP).Value
-
+        ' Assign formulas for fees
+        Cells(endIdx, b_RH_FEE_INTERP).Formula = "=" & Cells(endIdx, b_RH_UNITS).Address(False, False) & "*" _
+                                                     & Cells(endIdx, b_INTERPRATE).Address(False, False)
+        
+        Cells(endIdx, b_AH_FEE_INTERP).Formula = "=" & Cells(endIdx, b_AH_UNITS).Address(False, False) & "*(" _
+                                                     & Cells(endIdx, b_INTERPRATE).Address(False, False) & "+" _
+                                                     & CStr(INTERPRETER_OVERCHARGE) & ")"
+                                                     
+        Cells(endIdx, b_INTERPTOTAL).Formula = "=" & Cells(endIdx, b_RH_FEE_INTERP).Address(False, False) & "+" _
+                                                   & Cells(endIdx, b_AH_FEE_INTERP).Address(False, False)
+                                                   
         If LCase(Cells(i, b_STATUS)) <> "dnc" Then
-            Cells(endIdx, b_RH_FEE_SCCA).Value = units * SCCA_RATE
-            Cells(endIdx, b_SCCATOTAL).Value = Cells(endIdx, b_RH_FEE_SCCA).Value + Cells(endIdx, b_AH_FEE_SCCA).Value
-        Else
-            Cells(endIdx, b_SCCATOTAL).Value = 0
+            Cells(endIdx, b_RH_FEE_SCCA).Formula = "=" & Cells(endIdx, b_RH_UNITS).Address(False, False) & "*" & CStr(SCCA_RATE)
+            Cells(endIdx, b_AH_FEE_SCCA).Formula = "=" & Cells(endIdx, b_AH_UNITS).Address(False, False) & "*(" _
+                                                       & CStr(SCCA_RATE) & "+" & CStr(SCCA_OVERCHARGE) & ")"
         End If
-
-        ' Put "-" in empty fee cells
-        If postHoursUnits = 0 Then
-            Cells(endIdx, b_AH_FEE_INTERP).Value = "-"
-            Cells(endIdx, b_AH_FEE_INTERP).HorizontalAlignment = xlCenter
-            Cells(endIdx, b_AH_FEE_SCCA).Value = "-"
-            Cells(endIdx, b_AH_FEE_SCCA).HorizontalAlignment = xlCenter
-        End If
+        
+        Cells(endIdx, b_SCCATOTAL).Formula = "=" & Cells(endIdx, b_RH_FEE_SCCA).Address(False, False) & "+" _
+                                                & Cells(endIdx, b_AH_FEE_SCCA).Address(False, False)
 
         ' Underline units and fees
         With Range(Cells(endIdx, b_RH_UNITS), Cells(endIdx, b_SCCATOTAL)).Borders(xlEdgeBottom)
@@ -540,10 +540,10 @@ Public Sub RunAOLTIBilling()
     
     Call GlobalInit
 
-    If ValidateBillingCaption And LoadInterpreterRates Then
+    If ValidateBillingCaption And LoadInterpreterRates(IntepreterRatesFile) Then
         Call InitRatesColumn
         Call FindSeries
-        MsgBox "Success!"
+        MsgBox "Billing report created successfully!"
     End If
 
 End Sub
